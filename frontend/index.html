@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Google Fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic">
+
+    <!-- CSS Reset -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.css">
+
+    <!-- Milligram CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.css">
+
+    <title>Chat</title>
+
+    <style>
+        .chat-container {
+            width: 100%;
+            background: #f3f3f3;
+            padding: 1.5rem;
+            box-sizing: border-box;
+            border-radius: 5px;
+            border: solid 1px #e0e0e0;
+        }
+
+        .chat {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            height: 400px;
+            background: #fff;
+            padding: 2rem;
+            border-radius: 5px;
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+            overflow: auto;
+        }
+
+        .message {
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            padding: 0;
+        }
+
+        .self {
+            justify-content: flex-end;
+        }
+
+        .content {
+            width: auto;
+            max-width: 420px;
+            min-width: 200px;
+            background: #eee;
+            border-radius: 5px;
+            padding: 1rem 2rem;
+        }
+
+        .self .content {
+            background: #9b4dca;
+            color: #fff;
+        }
+
+        .user {
+            font-weight: bold;
+            display: block;
+            font-size: 1.4rem;
+            padding-bottom: .5rem;
+        }
+
+        .form {
+            height: 60px;
+            padding: 0 0 0 1rem;
+            display: flex;
+            align-items: stretch;
+            align-content: stretch;
+            justify-content: stretch;
+        }
+
+        .form input {
+            background: #fafafa;   
+            border-radius: 0;
+            border: none;     
+            width: 100%;
+            height: 100%;
+            padding: 3rem 1.5rem;
+        }
+
+        .form .column {
+            padding: 0;
+        }
+
+        .form button {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+        }
+
+        .form-top {
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            align-content: center;
+        }
+
+        .form-top .column {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-end;
+            align-content: flex-end;
+        }
+
+        .form-top button {
+            margin-bottom: 13px !important;
+        }
+
+        .form-top input,
+        .form-top select {
+            width: 190px;
+            margin-right: 2rem;
+        }
+    </style>
+</head>
+
+<body style="padding: 3rem;">
+    <h2>Chatify</h2>
+    <h4>The best realtime Chat application on the market</h4>
+    <div class="container-fluid form-top">
+        <div class="row">
+            <div class="column">
+                <div class="">
+                    <label for="roomname">Neuene Raum erstellen</label>
+                    <input id="roomname" type="text" placeholder="Name">
+                </div>
+                <div class="">
+                    <label for="username">Benutzername</label>
+                    <input id="username" type="text" placeholder="John">
+                </div>
+                <div class="">
+                    <button onclick="onCreateRoom()">Raum erstellen</button>
+                </div>
+            </div>
+            <div class="column">
+                <div class="">
+                    <label for="rooms">Raum auswählen</label>
+                    <select id="rooms">
+                    </select>
+                </div>
+                <div class="">
+                    <label for="username-join">Benutzername</label>
+                    <input id="username-join" type="text" placeholder="John">
+                </div>
+                <div class="">
+                    <button onclick="onJoinRoom()">Raum beitreten</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid chat-container" style="margin-top: 3rem;">
+        <div class="row">
+            <div class="column column-20" style="border-right: solid 1px #e0e0e0;">
+                <h4><b>Online</b></h4>
+                <ul id="userlist">
+                    
+                </ul>
+            </div>
+            <div class="column column-80">
+                <div class="chat" id="chat-container">
+                    
+                </div>
+                <div class="container-fluid form">
+                    <div class="row">
+                        <div class="column column-80">
+                            <input id="message" type="text" placeholder="Nachricht eingeben..." onchange="onTextChange(event)">
+                        </div>
+                        <div class="column column-20">
+                            <button style="width: 100%;" onclick="onSubmitMessage()">
+                                Senden
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <template id="message-foreign">
+        <div class="message">
+            <div class="content">
+                <span class="user">{from}</span>
+                {message}
+            </div>
+        </div>
+    </template>
+    <template id="message-self">
+        <div class="message self">
+            <div class="content">
+                <span class="user">Du selbst</span>
+                {message}
+            </div>
+        </div>
+    </template>
+
+    <script>
+        let connection = null;
+        let messages = [];
+        let username = '';
+
+        class Message {
+            constructor(type, data) {
+                this.type = type;
+                this.data = data;
+            }
+
+            json() {
+                return JSON.stringify(this);
+            }
+        }
+
+        const onJoinRoom = () => {
+            const room = document.getElementById('rooms').value;
+            const user = document.getElementById('username-join').value;
+            if (!room || !user) return;
+
+            sendWSMessage(new Message(1, {
+                userName: user,
+                roomName: room
+            }));
+
+            document.getElementById('rooms').value = '';
+            document.getElementById('username-join').value = '';
+            messages = [];
+            username = user;
+            document.getElementById('chat-container').innerHTML = '';
+        }
+
+        const onCreateRoom = () => {
+            const name = document.getElementById('roomname').value;
+            const user = document.getElementById('username').value;
+            if (!name || !user) return;
+
+            sendWSMessage(new Message(1, {
+                userName: user,
+                roomName: name
+            }));
+
+            document.getElementById('roomname').value = '';
+            document.getElementById('username').value = '';
+            messages = [];
+            username = user;
+            document.getElementById('chat-container').innerHTML = '';
+        }
+
+        const onTextChange = (event) => {
+            const value = event.target.value;
+            if (!value) return;
+
+            onSubmitMessage(value);
+        }
+
+        const onSubmitMessage = async () => {
+            const value = document.getElementById('message').value;
+            if (!value) return;
+
+            sendWSMessage(new Message(2, {
+                message: value
+            }));
+
+            document.getElementById('message').value = '';
+        }
+
+        const connectToWebSocket = () => {
+            if (connection) return;
+            console.log('Connect');
+            connection = new WebSocket('ws://192.168.8.101:6789');
+            connection.onopen = () => console.log('Connected');
+            connection.onmessage = (event) => onMessageReceived((event.data));
+        }
+
+        const onMessageReceived = (raw) => {
+            const message = JSON.parse(raw);
+            
+            if (message.type === 1) {
+                renderRooms(message.rooms);
+            }else if(message.type === 2) {
+                renderUsers(message.users);
+            }else if(message.type === 3) {
+                console.log(message);
+                renderMessages({
+                    text: message.message,
+                    from: message.from
+                });
+            }
+        }
+
+        const sendWSMessage = async (message) => {
+            if (!connection) return;
+            connection.send(message.json());
+        }
+
+        const renderRooms = (rooms) => {
+            const optionContainer = document.getElementById('rooms');
+            let items = '';
+            rooms.forEach(room => items += `<option value="${room}">${room}</option>`);
+            optionContainer.innerHTML = items;
+        }
+
+        const renderUsers = (users) => {
+            const optionContainer = document.getElementById('userlist');
+            let items = '';
+            users.forEach(user => items += `<li>${user}</li>`);
+            optionContainer.innerHTML = items;
+        }
+
+        const renderMessages = (message) => {
+            const messageContainer = document.getElementById('chat-container');
+            const messageTemplate = document.getElementById('message-foreign').innerHTML;
+            const messageSelfTemplate = document.getElementById('message-self').innerHTML;
+
+            if (message.from === username) {
+                messageContainer.innerHTML = messageContainer.innerHTML + messageSelfTemplate.replace('{message}', message.text);
+                console.log('Addes self message')
+            }else{
+                const messageHtml = messageTemplate.replace('{from}', message.from);
+                messageContainer.innerHTML = messageContainer.innerHTML + messageHtml.replace('{message}', message.text);
+                console.log('Added foreign message')
+            }
+        }
+
+        window.addEventListener('load', () => connectToWebSocket());
+    </script>
+
+</body>
+
+</html>
